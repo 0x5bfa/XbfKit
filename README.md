@@ -88,20 +88,3 @@ The supported format and dialect combinations are:
 `WUX` refers to `Windows.UI.Xaml`; `MUX` refers to `Microsoft.UI.Xaml`.
 The dialect must be supplied when decompiling because XBF2 does not retain
 enough information to distinguish those trusted framework schemas.
-
-## Development and releases
-
-The repository pins the .NET SDK used for builds. Run the following commands
-from the repository root:
-
-```powershell
-dotnet restore XbfKit.slnx
-dotnet build XbfKit.slnx --configuration Release --no-restore
-dotnet test --project XbfKit.Tests/XbfKit.Tests.csproj --configuration Release --no-build --no-restore
-```
-
-Pushing a tag in the form `vMAJOR.MINOR.PATCH` runs the release workflow. It
-builds and tests the package, creates both the NuGet package and its symbol
-package, and publishes them through NuGet Trusted Publishing. The package
-metadata contains the source repository and commit, and the workflow fixes
-the package timestamp to the tagged commit for reproducible output.
