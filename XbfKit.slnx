@@ -1,0 +1,12 @@
+<Solution>
+  <Configurations>
+    <Platform Name="Any CPU" />
+  </Configurations>
+  <Folder Name="/Solution Items/">
+    <File Path="LICENSE.txt" />
+    <File Path="NOTICE.txt" />
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="XbfKit/XbfKit.csproj" />
+  <Project Path="XbfKit.Tests/XbfKit.Tests.csproj" />
+</Solution>

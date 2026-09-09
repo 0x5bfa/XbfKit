@@ -1,0 +1,59 @@
+name: Publish NuGet package
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: windows-latest
+    environment: nuget.org
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Resolve package version
+        id: version
+        shell: pwsh
+        run: |
+          $tag = '${{ github.ref_name }}'
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$') {
+            throw "Tag '$tag' is not a valid vMAJOR.MINOR.PATCH package tag."
+          }
+          "version=$($Matches.version)" >> $env:GITHUB_OUTPUT
+
+      - name: Restore
+        run: dotnet restore XbfKit.slnx
+
+      - name: Build
+        run: dotnet build XbfKit.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet test --project XbfKit.Tests/XbfKit.Tests.csproj --configuration Release --no-restore
+
+      - name: Pack
+        run: dotnet pack XbfKit/XbfKit.csproj --configuration Release --no-build --no-restore --output artifacts -p:PackageVersion=${{ steps.version.outputs.version }}
+
+      # NuGet/login exchanges this job's GitHub OIDC token for a short-lived
+      # NuGet API key. Configure the matching policy on nuget.org first.
+      - name: NuGet login (OIDC Trusted Publishing)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish package
+        run: dotnet nuget push "artifacts\*.nupkg" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
