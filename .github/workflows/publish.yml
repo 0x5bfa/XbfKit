@@ -12,10 +12,7 @@ permissions:
 
 jobs:
   publish:
-    runs-on: windows-2025-vs2026
-    env:
-      CONFIGURATION: 'Release'
-      PLATFORM: 'x64'
+    runs-on: windows-latest
     environment: nuget.org
     permissions:
       contents: read
@@ -37,7 +34,7 @@ jobs:
           user: ${{ secrets.NUGET_USER }}
 
       - name: Pack
-        run: dotnet pack XbfKit/XbfKit.csproj -c $env:CONFIGURATION -a $env:PLATFORM -o $env:OUTPUT_DIR
+        run: dotnet pack XbfKit/XbfKit.csproj -c Release -o $env:OUTPUT_DIR
 
       - name: Publish to NuGet.org
         run: |
