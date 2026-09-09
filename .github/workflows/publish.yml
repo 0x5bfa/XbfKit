@@ -1,9 +1,7 @@
 name: Publish NuGet package
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -21,7 +19,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
         with:
@@ -31,11 +28,12 @@ jobs:
         id: release
         shell: pwsh
         run: |
-          $tag = '${{ github.ref_name }}'
-          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?)$') {
-            throw "Tag '$tag' is not a valid vMAJOR.MINOR.PATCH package tag."
+          $project = dotnet msbuild XbfKit/XbfKit.csproj -getProperty:PackageVersion -getProperty:Version | ConvertFrom-Json
+          $version = $project.Properties.PackageVersion
+          if ($version -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+            throw "PackageVersion '$version' is not a valid MAJOR.MINOR.PATCH version."
           }
-          "version=$($Matches.version)" >> $env:GITHUB_OUTPUT
+          "version=$version" >> $env:GITHUB_OUTPUT
           "timestamp=$(git show -s --format=%ct HEAD)" >> $env:GITHUB_OUTPUT
 
       - name: Restore
