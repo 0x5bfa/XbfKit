@@ -19,7 +19,7 @@
         <IncludeSymbols>true</IncludeSymbols>
         <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <PackageId>XbfKit</PackageId>
-        <Version>0.1.0</Version>
+        <Version>0.1.1</Version>
         <Authors>0x5bfa</Authors>
         <Description>Read, decompile, compile, and write versioned XBF documents.</Description>
         <PackageTags>xbf; xaml; decompiler; compiler; reverse-engineering</PackageTags>
