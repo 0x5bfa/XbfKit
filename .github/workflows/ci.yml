@@ -18,13 +18,49 @@ jobs:
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.400
+
+      - name: Resolve deterministic timestamp
+        id: build
+        shell: pwsh
+        run: |
+          $timestamp = git show -s --format=%ct HEAD
+          "timestamp=$timestamp" >> $env:GITHUB_OUTPUT
 
       - name: Restore
         run: dotnet restore XbfKit.slnx
 
       - name: Build
-        run: dotnet build XbfKit.slnx --configuration Release --no-restore
+        run: dotnet build XbfKit.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:DeterministicTimestamp=${{ steps.build.outputs.timestamp }}
 
       - name: Test
-        run: dotnet test --project XbfKit.Tests/XbfKit.Tests.csproj --configuration Release --no-restore
+        run: dotnet test --project XbfKit.Tests/XbfKit.Tests.csproj --configuration Release --no-build --no-restore
+
+      - name: Verify deterministic packages
+        shell: pwsh
+        run: |
+          $timestamp = '${{ steps.build.outputs.timestamp }}'
+          $common = @(
+            'XbfKit/XbfKit.csproj',
+            '--configuration', 'Release',
+            '--no-build',
+            '--no-restore',
+            '-p:PackageVersion=0.0.0-ci',
+            '-p:ContinuousIntegrationBuild=true',
+            "-p:DeterministicTimestamp=$timestamp",
+            '-p:RepositoryCommit=${{ github.sha }}'
+          )
+
+          dotnet pack @common --output artifacts\pack-a
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          dotnet pack @common --output artifacts\pack-b
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $files = @('XbfKit.0.0.0-ci.nupkg', 'XbfKit.0.0.0-ci.snupkg')
+          foreach ($file in $files) {
+            $first = (Get-FileHash "artifacts\pack-a\$file" -Algorithm SHA256).Hash
+            $second = (Get-FileHash "artifacts\pack-b\$file" -Algorithm SHA256).Hash
+            if ($first -ne $second) {
+              throw "Deterministic package check failed for $file."
+            }
+          }

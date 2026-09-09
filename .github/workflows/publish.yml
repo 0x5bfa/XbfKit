@@ -19,14 +19,16 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: 10.0.400
 
-      - name: Resolve package version
-        id: version
+      - name: Resolve package version and source timestamp
+        id: release
         shell: pwsh
         run: |
           $tag = '${{ github.ref_name }}'
@@ -34,18 +36,19 @@ jobs:
             throw "Tag '$tag' is not a valid vMAJOR.MINOR.PATCH package tag."
           }
           "version=$($Matches.version)" >> $env:GITHUB_OUTPUT
+          "timestamp=$(git show -s --format=%ct HEAD)" >> $env:GITHUB_OUTPUT
 
       - name: Restore
         run: dotnet restore XbfKit.slnx
 
       - name: Build
-        run: dotnet build XbfKit.slnx --configuration Release --no-restore
+        run: dotnet build XbfKit.slnx --configuration Release --no-restore -p:ContinuousIntegrationBuild=true -p:DeterministicTimestamp=${{ steps.release.outputs.timestamp }} -p:RepositoryCommit=${{ github.sha }}
 
       - name: Test
-        run: dotnet test --project XbfKit.Tests/XbfKit.Tests.csproj --configuration Release --no-restore
+        run: dotnet test --project XbfKit.Tests/XbfKit.Tests.csproj --configuration Release --no-build --no-restore
 
       - name: Pack
-        run: dotnet pack XbfKit/XbfKit.csproj --configuration Release --no-build --no-restore --output artifacts -p:PackageVersion=${{ steps.version.outputs.version }}
+        run: dotnet pack XbfKit/XbfKit.csproj --configuration Release --no-build --no-restore --output artifacts -p:PackageVersion=${{ steps.release.outputs.version }} -p:ContinuousIntegrationBuild=true -p:DeterministicTimestamp=${{ steps.release.outputs.timestamp }} -p:RepositoryCommit=${{ github.sha }}
 
       # NuGet/login exchanges this job's GitHub OIDC token for a short-lived
       # NuGet API key. Configure the matching policy on nuget.org first.
@@ -55,5 +58,17 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
-      - name: Publish package
-        run: dotnet nuget push "artifacts\*.nupkg" --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+      - name: Publish packages
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          $source = 'https://api.nuget.org/v3/index.json'
+          Get-ChildItem artifacts -Filter '*.nupkg' -File | ForEach-Object {
+            dotnet nuget push $_.FullName --api-key $env:NUGET_API_KEY --source $source --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          Get-ChildItem artifacts -Filter '*.snupkg' -File | ForEach-Object {
+            dotnet nuget push $_.FullName --api-key $env:NUGET_API_KEY --source $source --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
