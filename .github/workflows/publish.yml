@@ -56,17 +56,10 @@ jobs:
         with:
           user: ${{ secrets.NUGET_USER }}
 
-      - name: Publish packages
-        shell: pwsh
+      - name: Publish to NuGet.org
         env:
+          OUTPUT_DIR: artifacts
           NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
         run: |
-          $source = 'https://api.nuget.org/v3/index.json'
-          Get-ChildItem artifacts -Filter '*.nupkg' -File | ForEach-Object {
-            dotnet nuget push $_.FullName --api-key $env:NUGET_API_KEY --source $source --skip-duplicate
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
-          Get-ChildItem artifacts -Filter '*.snupkg' -File | ForEach-Object {
-            dotnet nuget push $_.FullName --api-key $env:NUGET_API_KEY --source $source --skip-duplicate
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          }
+          dotnet nuget push ${{ env.OUTPUT_DIR }}\*.nupkg --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+          dotnet nuget push ${{ env.OUTPUT_DIR }}\*.snupkg --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
