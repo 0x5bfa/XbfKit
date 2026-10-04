@@ -1,7 +1,9 @@
-name: Publish NuGet package
+name: CD
 
 on:
   workflow_dispatch:
+
+run-name: 'Publish package to NuGet.org'
 
 env:
   WORKING_DIR:         '${{ github.workspace }}' # 'D:\a\XbfKit\XbfKit'
@@ -20,11 +22,9 @@ jobs:
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
+        uses: actions/checkout@v7
       - name: Set up .NET
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
       - name: NuGet login
