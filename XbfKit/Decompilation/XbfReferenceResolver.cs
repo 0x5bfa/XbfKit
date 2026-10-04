@@ -70,13 +70,13 @@ internal sealed class XbfReferenceResolver
     /// <summary>Resolves an XBF2 property reference to a XAML property name.</summary>
     internal XamlPropertyName Property(Xbf2Reference reference, XamlTypeName? currentType = null)
     {
-        return reference.IsTrusted ? TrustedProperty(reference.ObjectId, currentType) : LocalProperty(reference.ObjectId);
+        return reference.IsTrusted ? TrustedProperty(reference.ObjectId, currentType) : LocalProperty(reference.ObjectId, currentType);
     }
 
     /// <summary>Resolves an XBF1 property reference to a XAML property name.</summary>
     internal XamlPropertyName Property(Xbf1Reference reference, XamlTypeName? currentType = null)
     {
-        return LocalProperty(reference.ObjectId);
+        return LocalProperty(reference.ObjectId, currentType);
     }
 
     private XamlTypeName TrustedType(ushort id)
@@ -139,7 +139,7 @@ internal sealed class XbfReferenceResolver
         return result == XamlNamespaces.LegacyPresentation ? XamlNamespaces.Presentation : result;
     }
 
-    private XamlPropertyName LocalProperty(uint id)
+    private XamlPropertyName LocalProperty(uint id, XamlTypeName? currentType)
     {
         XbfPropertyEntry entry = Get(_metadata.Properties, id, "property");
         string name = String(entry.NameStringId);
@@ -155,12 +155,17 @@ internal sealed class XbfReferenceResolver
 
         XamlTypeName declaringType = LocalType(entry.DeclaringTypeId);
         bool attached = IsAttachedProperty(declaringType, name);
-        XamlTypeName? emittedDeclaringType = ShouldQualifyProperty(entry, declaringType, name) ? declaringType : null;
+        XamlTypeName? emittedDeclaringType = ShouldQualifyProperty(entry, declaringType, name, currentType) ? declaringType : null;
         return new XamlPropertyName(name, emittedDeclaringType, IsAttached: attached);
     }
 
-    private bool ShouldQualifyProperty(XbfPropertyEntry property, XamlTypeName declaringType, string propertyName)
+    private bool ShouldQualifyProperty(XbfPropertyEntry property, XamlTypeName declaringType, string propertyName, XamlTypeName? currentType)
     {
+        if (currentType is not null && XamlFallbackSchema.IsKnownInheritedProperty(currentType, declaringType, propertyName))
+        {
+            return false;
+        }
+
         if (property.Flags.HasFlag(XbfPropertyFlags.IsUnknown) || declaringType.NamespaceUri != XamlNamespaces.Presentation || !IsKnownFrameworkType(property.DeclaringTypeId))
         {
             return true;
