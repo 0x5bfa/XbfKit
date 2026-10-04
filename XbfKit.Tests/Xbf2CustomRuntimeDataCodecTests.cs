@@ -45,6 +45,8 @@ public sealed class Xbf2CustomRuntimeDataCodecTests
             data.Setters.Add(new Xbf2StyleSetter
             {
                 Flags = Xbf2StyleSetterFlags.HasTokenForSelf,
+                PropertyName = type == Xbf2CustomRuntimeDataType.StyleV3 ? null : Local(7),
+                DeclaringType = type == Xbf2CustomRuntimeDataType.StyleV3 ? null : Trusted(8),
                 Token = 29,
             });
             if (type == Xbf2CustomRuntimeDataType.StyleV3)
@@ -57,6 +59,34 @@ public sealed class Xbf2CustomRuntimeDataCodecTests
             Assert.AreEqual(2, result.Setters.Count);
             Assert.AreEqual(type == Xbf2CustomRuntimeDataType.StyleV3 ? 1 : 0, result.ConditionalObjects.Count);
         }
+    }
+
+    [TestMethod]
+    [DataRow(Xbf2CustomRuntimeDataType.StyleV1, true, "0F0100000201D001E5840102")]
+    [DataRow(Xbf2CustomRuntimeDataType.StyleV2, true, "0F0100000801D001E5840102")]
+    [DataRow(Xbf2CustomRuntimeDataType.StyleV3, true, "0F0100000B01D001010002")]
+    [DataRow(Xbf2CustomRuntimeDataType.StyleV1, false, "0F0100000201C001070008800102")]
+    [DataRow(Xbf2CustomRuntimeDataType.StyleV2, false, "0F0100000801C001070008800102")]
+    [DataRow(Xbf2CustomRuntimeDataType.StyleV3, false, "0F0100000B01C001010002")]
+    public void CompleteSetterTokensFollowTheNativeVersionedLayout(Xbf2CustomRuntimeDataType type, bool resolved, string hex)
+    {
+        // Native StyleCustomRuntimeDataSerializer persists property metadata for
+        // StyleV1/V2, including mutable setters like ColorSelector's GroupName.
+        // These fixed bytes also check that the following PopScope stays aligned.
+        byte[] bytes = Convert.FromHexString(hex);
+        Xbf2DecodedSubstream decoded = new Xbf2Substream { NodeBytes = bytes }.Decode();
+        Assert.AreEqual(2, decoded.Instructions.Count);
+        Assert.AreEqual(Xbf2Opcode.PopScope, decoded.Instructions[1].Opcode);
+        Assert.AreEqual(bytes.Length - 1, decoded.Instructions[1].Offset);
+        Xbf2StyleRuntimeData data = (Xbf2StyleRuntimeData)decoded.Instructions[0].Segment!.RuntimeData!;
+        Assert.AreEqual(type, data.Type);
+        Xbf2StyleSetter setter = data.Setters.Single();
+        Assert.AreEqual(1u, setter.Token);
+        bool hasProperty = type != Xbf2CustomRuntimeDataType.StyleV3;
+        Assert.AreEqual(hasProperty && resolved ? Trusted(1253) : (Xbf2Reference?)null, setter.Property);
+        Assert.AreEqual(hasProperty && !resolved ? Local(7) : (Xbf2Reference?)null, setter.PropertyName);
+        Assert.AreEqual(hasProperty && !resolved ? Trusted(8) : (Xbf2Reference?)null, setter.DeclaringType);
+        CollectionAssert.AreEqual(bytes, Xbf2InstructionEncoder.EncodeInstructions(decoded.Instructions));
     }
 
     [TestMethod]

@@ -461,7 +461,7 @@ internal static class Xbf2Compiler
             {
                 XElement[] setters = [.. setterContainers.SelectMany(value => value.Elements())
 , .. directSetters];
-                WriteStyleRuntimeData(setters, setterContainers, metadata, writer);
+                WriteStyleRuntimeData(element, setters, setterContainers, metadata, writer);
                 handled.UnionWith(setterContainers);
                 handled.UnionWith(directSetters);
             }
@@ -513,7 +513,7 @@ internal static class Xbf2Compiler
         writer.Add(Xbf2Opcode.SetCustomRuntimeData, resources[0], segment: segment);
     }
 
-    private static void WriteStyleRuntimeData(IReadOnlyList<XElement> setters, IReadOnlyList<XElement> setterContainers, XbfMetadataBuilder metadata, InstructionBuilder writer)
+    private static void WriteStyleRuntimeData(XElement style, IReadOnlyList<XElement> setters, IReadOnlyList<XElement> setterContainers, XbfMetadataBuilder metadata, InstructionBuilder writer)
     {
         InstructionBuilder deferredWriter = writer.CreateSubstream();
         var runtimeData = new Xbf2StyleRuntimeData
@@ -527,9 +527,33 @@ internal static class Xbf2Compiler
         {
             uint token = deferredWriter.CurrentOffset;
             WriteObject(setter, metadata, deferredWriter);
+            Xbf2Reference? propertyName = null;
+            Xbf2Reference? declaringType = null;
+            if (runtimeData.Type != Xbf2CustomRuntimeDataType.StyleV3)
+            {
+                // StyleV1/V2 require property metadata even for a complete deferred setter.
+                string property = setter.Attribute("Property")?.Value
+                    ?? setter.Elements().FirstOrDefault(value => value.Name.LocalName == "Setter.Property")?.Value.Trim()
+                    ?? throw new InvalidDataException("A legacy style setter must specify Property.");
+                int separator = property.LastIndexOf('.');
+                string typeName = separator >= 0 ? property[..separator]
+                    : style.Attribute("TargetType")?.Value
+                        ?? style.Elements().FirstOrDefault(value => value.Name.LocalName == "Style.TargetType")?.Value.Trim()
+                        ?? throw new InvalidDataException("A legacy style setter requires a declaring type or Style.TargetType.");
+                if (XamlMarkupExtensionParser.TryParse(typeName, out XamlMarkupExtension? extension) && StripPrefix(extension!.TypeName) == "Type")
+                {
+                    typeName = RequiredMarkupArgument(extension, "TypeName");
+                }
+
+                propertyName = Reference(metadata.String(separator >= 0 ? property[(separator + 1)..] : property));
+                declaringType = metadata.TypeReference(QualifiedTypeName(setter, typeName));
+            }
+
             runtimeData.Setters.Add(new Xbf2StyleSetter
             {
                 Flags = Xbf2StyleSetterFlags.HasTokenForSelf,
+                PropertyName = propertyName,
+                DeclaringType = declaringType,
                 Token = token,
             });
 

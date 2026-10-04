@@ -280,17 +280,17 @@ public static class Xbf2InstructionEncoder
     private static void WriteStyle(BinaryWriter writer, Xbf2StyleRuntimeData style)
     {
         RequireRuntimeType(style.Type, Xbf2CustomRuntimeDataType.StyleV1, Xbf2CustomRuntimeDataType.StyleV2, Xbf2CustomRuntimeDataType.StyleV3);
-        WriteVector(writer, style.Setters, WriteStyleSetter);
+        WriteVector(writer, style.Setters, (itemWriter, setter) => WriteStyleSetter(itemWriter, setter, style.Type));
         if (style.Type == Xbf2CustomRuntimeDataType.StyleV3)
         {
             WriteConditionalObjects(writer, style.ConditionalObjects);
         }
     }
 
-    private static void WriteStyleSetter(BinaryWriter writer, Xbf2StyleSetter setter)
+    private static void WriteStyleSetter(BinaryWriter writer, Xbf2StyleSetter setter, Xbf2CustomRuntimeDataType type)
     {
         writer.WriteVarUInt32((uint)setter.Flags);
-        if (!setter.Flags.HasFlag(Xbf2StyleSetterFlags.HasTokenForSelf))
+        if (type != Xbf2CustomRuntimeDataType.StyleV3 || !setter.Flags.HasFlag(Xbf2StyleSetterFlags.HasTokenForSelf))
         {
             if (setter.Flags.HasFlag(Xbf2StyleSetterFlags.IsPropertyResolved))
             {

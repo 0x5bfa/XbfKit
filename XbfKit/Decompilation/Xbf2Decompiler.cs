@@ -124,6 +124,15 @@ internal sealed class Xbf2Decompiler
 
     private void Execute(Xbf2Instruction instruction)
     {
+        // Unused directive or event-handler constants can remain in native XBF.
+        // Only an immediately following AddToCollection consumes a constant;
+        // retaining it across other instructions would hide a completed object.
+        if (_hasPendingConstant && instruction.Opcode != Xbf2Opcode.AddToCollection)
+        {
+            _pendingConstant = null;
+            _hasPendingConstant = false;
+        }
+
         switch (instruction.Opcode)
         {
             case Xbf2Opcode.PushScope:

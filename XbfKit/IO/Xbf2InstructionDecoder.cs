@@ -244,7 +244,7 @@ public static class Xbf2InstructionDecoder
     private static Xbf2StyleRuntimeData ReadStyle(ref XbfBufferReader reader, Xbf2CustomRuntimeDataType type)
     {
         var result = new Xbf2StyleRuntimeData { Type = type };
-        ReadVector(ref reader, (ref itemReader) => result.Setters.Add(ReadStyleSetter(ref itemReader)));
+        ReadVector(ref reader, (ref itemReader) => result.Setters.Add(ReadStyleSetter(ref itemReader, type)));
         if (type == Xbf2CustomRuntimeDataType.StyleV3)
         {
             ReadConditionalObjects(ref reader, result.ConditionalObjects);
@@ -253,13 +253,14 @@ public static class Xbf2InstructionDecoder
         return result;
     }
 
-    private static Xbf2StyleSetter ReadStyleSetter(ref XbfBufferReader reader)
+    private static Xbf2StyleSetter ReadStyleSetter(ref XbfBufferReader reader, Xbf2CustomRuntimeDataType type)
     {
         var flags = (Xbf2StyleSetterFlags)reader.ReadVarUInt32();
         Xbf2Reference? property = null;
         Xbf2Reference? propertyName = null;
         Xbf2Reference? declaringType = null;
-        if (!flags.HasFlag(Xbf2StyleSetterFlags.HasTokenForSelf))
+        // Only StyleV3 omits the property when the token represents the whole setter.
+        if (type != Xbf2CustomRuntimeDataType.StyleV3 || !flags.HasFlag(Xbf2StyleSetterFlags.HasTokenForSelf))
         {
             if (flags.HasFlag(Xbf2StyleSetterFlags.IsPropertyResolved))
             {

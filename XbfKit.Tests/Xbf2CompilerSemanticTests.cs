@@ -6,6 +6,48 @@ namespace XbfKit.Tests;
 public sealed class Xbf2CompilerSemanticTests
 {
     [TestMethod]
+    [DataRow("10.0.10240.0")]
+    [DataRow("10.0.14393.0")]
+    public void LegacyStyleSetterTokensIncludeTheirPropertyMetadata(string target)
+    {
+        string[] documents =
+        [
+            """
+            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="Button">
+                <Setter Property="Opacity" Value="0.5" />
+            </Style>
+            """,
+            """
+            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" TargetType="{x:Type Button}">
+                <Setter Property="Opacity" Value="0.5" />
+            </Style>
+            """,
+            """
+            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" TargetType="Button">
+                <Setter Property="Grid.Row" Value="1" />
+            </Style>
+            """,
+            """
+            <Style xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:local="using:Contoso" TargetType="local:Widget">
+                <Setter Property="CustomValue" Value="42" />
+            </Style>
+            """,
+        ];
+        string[] propertyNames = ["Opacity", "Opacity", "Row", "CustomValue"];
+        XbfCompilationOptions options = TestUtilities.WuxOptions(target: Version.Parse(target));
+        for (int index = 0; index < documents.Length; index++)
+        {
+            XbfDocument document = TestUtilities.Compile(documents[index], options);
+            Xbf2StyleSetter setter = TestUtilities.RuntimeData<Xbf2StyleRuntimeData>(document).Single().Setters.Single();
+            Assert.IsTrue(setter.Flags.HasFlag(Xbf2StyleSetterFlags.HasTokenForSelf));
+            Assert.IsNotNull(setter.PropertyName);
+            Assert.IsNotNull(setter.DeclaringType);
+            Assert.AreEqual(propertyNames[index], document.Metadata.Strings[setter.PropertyName.Value.ObjectId]);
+            _ = TestUtilities.AssertSemanticRoundTrip(documents[index], options);
+        }
+    }
+
+    [TestMethod]
     public void DictionaryValuedMembersPreserveExplicitKeys()
     {
         string[] documents =
