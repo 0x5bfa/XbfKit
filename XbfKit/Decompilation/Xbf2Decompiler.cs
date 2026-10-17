@@ -521,26 +521,34 @@ internal sealed class Xbf2Decompiler
 
     private void ApplyResourceDictionary(uint substream, Xbf2ResourceDictionaryRuntimeData dictionary)
     {
-        ApplyResourceEntries(substream, dictionary.Resources, dictionary.ConditionalObjects, hasExplicitKey: true);
-        ApplyResourceEntries(substream, dictionary.ImplicitResources, dictionary.ConditionalObjects, hasExplicitKey: false);
-        ApplyResourceEntries(substream, dictionary.ConditionalResources, dictionary.ConditionalObjects, hasExplicitKey: true);
-        ApplyResourceEntries(substream, dictionary.ConditionalImplicitResources, dictionary.ConditionalObjects, hasExplicitKey: false);
-    }
+        var resources = new List<(Xbf2ResourceEntry Entry, uint Token, bool HasExplicitKey)>();
+        AddEntries(dictionary.Resources, hasExplicitKey: true);
+        AddEntries(dictionary.ImplicitResources, hasExplicitKey: false);
+        AddEntries(dictionary.ConditionalResources, hasExplicitKey: true);
+        AddEntries(dictionary.ConditionalImplicitResources, hasExplicitKey: false);
 
-    private void ApplyResourceEntries(uint substream, IReadOnlyList<Xbf2ResourceEntry> entries, IReadOnlyList<Xbf2ConditionalObject> conditionalObjects, bool hasExplicitKey)
-    {
-        foreach (Xbf2ResourceEntry entry in entries)
+        // The runtime data stores each resource category separately. Tokens are offsets in the
+        // deferred substream, so sorting them restores declaration order across those categories.
+        foreach ((Xbf2ResourceEntry entry, uint token, bool hasExplicitKey) in resources.OrderBy(resource => resource.Token))
         {
-            foreach (uint token in entry.Tokens)
+            IReadOnlyList<Xbf2Predicate> predicates = PredicatesForToken(dictionary.ConditionalObjects, token);
+            object? value = Realize(substream, token, predicates: predicates);
+            if (hasExplicitKey && value is XamlObjectModel xamlObject)
             {
-                IReadOnlyList<Xbf2Predicate> predicates = PredicatesForToken(conditionalObjects, token);
-                object? value = Realize(substream, token, predicates: predicates);
-                if (hasExplicitKey && value is XamlObjectModel xamlObject)
-                {
-                    xamlObject.SetValue(Directive("Key"), _resolver.String(entry.Key.String));
-                }
+                xamlObject.SetValue(Directive("Key"), _resolver.String(entry.Key.String));
+            }
 
-                AddItem(_objects.Peek(), value);
+            AddItem(_objects.Peek(), value);
+        }
+
+        void AddEntries(IReadOnlyList<Xbf2ResourceEntry> entries, bool hasExplicitKey)
+        {
+            foreach (Xbf2ResourceEntry entry in entries)
+            {
+                foreach (uint token in entry.Tokens)
+                {
+                    resources.Add((entry, token, hasExplicitKey));
+                }
             }
         }
     }

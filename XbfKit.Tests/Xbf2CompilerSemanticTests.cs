@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace XbfKit.Tests;
@@ -101,6 +102,45 @@ public sealed class Xbf2CompilerSemanticTests
         StringAssert.Contains(result, "x:Key=\"AccentBrush\"");
         StringAssert.Contains(result, "TargetType=\"Button\"");
         StringAssert.Contains(result, "x:Key=\"ItemTemplate\"");
+    }
+
+    [TestMethod]
+    public void ResourceDictionariesPreserveDeclarationOrderAcrossKeyKinds()
+    {
+        const string xaml = """
+            <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+                <DataTemplate x:Key="TileGrid_TileTemplate_Small">
+                    <TextBlock Text="Small" />
+                </DataTemplate>
+                <Style TargetType="Button">
+                    <Setter Property="Opacity" Value="0.5" />
+                </Style>
+                <DataTemplate x:Key="TileGrid_TileTemplate">
+                    <TextBlock Text="Regular" />
+                </DataTemplate>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Opacity" Value="0.75" />
+                </Style>
+                <DataTemplate x:Key="TileGrid_InstallingTileOverlay">
+                    <TextBlock Text="Installing" />
+                </DataTemplate>
+            </ResourceDictionary>
+            """;
+
+        string result = TestUtilities.AssertSemanticRoundTrip(xaml);
+        XNamespace x = TestUtilities.XamlNamespace;
+        string[] resources = [.. XDocument.Parse(result).Root!.Elements().Select(element => (string?)element.Attribute(x + "Key")
+                ?? $"implicit:{(string?)element.Attribute("TargetType")}")];
+
+        Assert.AreSequenceEqual(
+            [
+                "TileGrid_TileTemplate_Small",
+                "implicit:Button",
+                "TileGrid_TileTemplate",
+                "implicit:TextBlock",
+                "TileGrid_InstallingTileOverlay",
+            ],
+            resources);
     }
 
     [TestMethod]
